@@ -22,6 +22,7 @@ typedef float PageRankType;
 void pageRankSerial(Graph &g, int max_iters)
 {
     uintV n = g.n_;
+    std::cout<<"Number of nodes: " << n << std::endl;
 
     PageRankType *pr_curr = new PageRankType[n];
     PageRankType *pr_next = new PageRankType[n];

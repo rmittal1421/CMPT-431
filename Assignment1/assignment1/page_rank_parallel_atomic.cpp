@@ -73,10 +73,10 @@ void pageRankSerial(Graph &g, int max_iters)
 
                         // std::lock_guard<std::mutex> lock(mutex_vector[v]);
                         // pr_next[v] = pr_next[v] + (pr_curr[u] / out_degree);
-                        float current_val;
-                        do {
-                            current_val = pr_next[v];   
-                        }
+                        PageRankType current_val = pr_next[v];
+                        // do {
+                        //     current_val = pr_next[v];   
+                        // }
                         while(!pr_next[v].compare_exchange_strong(current_val, current_val + (pr_curr[u]/out_degree), std::memory_order_release,
                                         std::memory_order_relaxed));
                     }
