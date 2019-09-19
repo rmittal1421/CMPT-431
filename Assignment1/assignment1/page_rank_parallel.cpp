@@ -15,7 +15,6 @@
 #define PAGE_RANK(x) (15000 + (5 * x) / 6)
 #define CHANGE_IN_PAGE_RANK(x, y) std::abs(x - y)
 typedef int64_t PageRankType;
-typedef std::atomic<PageRankType> AtomicPageRankType;
 #else
 #define INIT_PAGE_RANK 1.0
 #define EPSILON 0.01
@@ -23,7 +22,6 @@ typedef std::atomic<PageRankType> AtomicPageRankType;
 #define PAGE_RANK(x) (1 - DAMPING + DAMPING * x)
 #define CHANGE_IN_PAGE_RANK(x, y) std::fabs(x - y)
 typedef float PageRankType;
-typedef std::atomic<float> AtomicPageRankType;
 #endif
 
 void threadFunction() {
@@ -36,8 +34,7 @@ void pageRankSerial(Graph &g, int max_iters)
     std::cout<<"Number of nodes: " << n << std::endl;
 
     PageRankType *pr_curr = new PageRankType[n];
-    // PageRankType *pr_next = new PageRankType[n];
-    AtomicPageRankType *pr_next = new AtomicPageRankType[n];
+    PageRankType *pr_next = new PageRankType[n];
 
     for (uintV i = 0; i < n; i++)
     {
@@ -59,8 +56,8 @@ void pageRankSerial(Graph &g, int max_iters)
     std::vector<std::mutex> mutex_vector(n);
 
     uintV start = 0, eachWorkload = n/4, leftOver = n % 4;
-    // std::cout<<start<<" "<<eachWorkload<<std::endl;
     for(int i = 0; i < 4; i++) {
+        uintV carryOver = (leftOver > 0) ? 1 : 0;
         threadList[i] = std::thread ([&](uintV s, uintV workload) {
             for (int iter = 0; iter < max_iters; iter++) {
                 // for each vertex 'u', process all its outNeighbors 'v'
@@ -71,14 +68,8 @@ void pageRankSerial(Graph &g, int max_iters)
                     {
                         uintV v = g.vertices_[u].getOutNeighbor(i);
 
-                        // std::lock_guard<std::mutex> lock(mutex_vector[v]);
-                        // pr_next[v] = pr_next[v] + (pr_curr[u] / out_degree);
-                        float current_val;
-                        do {
-                            current_val = pr_next[v];   
-                        }
-                        while(!pr_next[v].compare_exchange_strong(current_val, current_val + (pr_curr[u]/out_degree), std::memory_order_release,
-                                        std::memory_order_relaxed));
+                        std::lock_guard<std::mutex> lock(mutex_vector[v]);
+                        pr_next[v] = pr_next[v] + (pr_curr[u] / out_degree);
                     }
                 }
 
@@ -95,14 +86,13 @@ void pageRankSerial(Graph &g, int max_iters)
 
                 myBarrier.wait();
             }
-        }, start, eachWorkload + ((leftOver > 0) ? 1 : 0));
-        start += eachWorkload + ((leftOver > 0) ? 1 : 0);
+        }, start, eachWorkload + carryOver);
+        start += eachWorkload + carryOver;
         if(leftOver > 0) leftOver--;
     }
 
     for(auto &t : threadList) {
         t.join();
-        std::cout<<"Joined a thread"<<std::endl;
     }
 
     // for (int iter = 0; iter < max_iters; iter++)

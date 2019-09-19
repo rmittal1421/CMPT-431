@@ -48,8 +48,11 @@ void piCalculation(uint n)
     // std::cout<<fut.get()<<std::endl;
 
     uint circle_points = 0;
+    uint eachWorkload = n/4, leftOver = n%4;
     for(int i = 0; i < 4; i++) {
-        futureList[i] = std::async(std::launch::async, get_points_in_circle, n/4, random_seed);
+        uint carryOver = (leftOver > 0) ? 1 : 0;
+        futureList[i] = std::async(std::launch::async, get_points_in_circle, eachWorkload + carryOver, random_seed);
+        if(leftOver > 0) leftOver--;
     }
 
     for(auto &f : futureList) 

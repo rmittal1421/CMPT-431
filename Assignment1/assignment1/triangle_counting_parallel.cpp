@@ -45,22 +45,38 @@ void triangleCountSerial(Graph &g)
 
     // Create threads and distribute the work across T threads
     // -------------------------------------------------------------------
+    std::future<uintV> futureList[4];
+    uintV start = 0, eachWorkload = n/4, leftOver = n%4;
+
     t1.start();
     // Process each edge <u,v>
-    for (uintV u = 0; u < n; u++)
-    {
-        // For each outNeighbor v, find the intersection of inNeighbor(u) and outNeighbor(v)
-        uintE out_degree = g.vertices_[u].getOutDegree();
-        for (uintE i = 0; i < out_degree; i++)
-        {
-            uintV v = g.vertices_[u].getOutNeighbor(i);
-            triangle_count += countTriangles(g.vertices_[u].getInNeighbors(),
-                                             g.vertices_[u].getInDegree(),
-                                             g.vertices_[v].getOutNeighbors(),
-                                             g.vertices_[v].getOutDegree(),
-                                             u,
-                                             v);
-        }
+    for(int i = 0; i < 4; i++) {
+        uintV carryOver = (leftOver > 0) ? 1 : 0;
+        futureList[i] = std::async (std::launch::async, [&](uintV s, uintV workload){
+            uintV local_count = 0;
+            for (uintV u = s; u < (s + workload); u++)
+            {
+                // For each outNeighbor v, find the intersection of inNeighbor(u) and outNeighbor(v)
+                uintE out_degree = g.vertices_[u].getOutDegree();
+                for (uintE i = 0; i < out_degree; i++)
+                {
+                    uintV v = g.vertices_[u].getOutNeighbor(i);
+                    local_count += countTriangles(g.vertices_[u].getInNeighbors(),
+                                                    g.vertices_[u].getInDegree(),
+                                                    g.vertices_[v].getOutNeighbors(),
+                                                    g.vertices_[v].getOutDegree(),
+                                                    u,
+                                                    v);
+                }
+            }
+            return local_count;
+        }, start, eachWorkload + carryOver);
+        start += eachWorkload + carryOver;
+        if(leftOver > 0) leftOver--;
+    }
+
+    for(auto &f: futureList) {
+        triangle_count += f.get();
     }
     time_taken = t1.stop();
     // -------------------------------------------------------------------

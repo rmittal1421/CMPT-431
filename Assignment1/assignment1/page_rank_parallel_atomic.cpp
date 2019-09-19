@@ -61,6 +61,7 @@ void pageRankSerial(Graph &g, int max_iters)
     uintV start = 0, eachWorkload = n/4, leftOver = n % 4;
     // std::cout<<start<<" "<<eachWorkload<<std::endl;
     for(int i = 0; i < 4; i++) {
+        uintV carryOver = (leftOver > 0) ? 1 : 0;
         threadList[i] = std::thread ([&](uintV s, uintV workload) {
             for (int iter = 0; iter < max_iters; iter++) {
                 // for each vertex 'u', process all its outNeighbors 'v'
@@ -95,8 +96,8 @@ void pageRankSerial(Graph &g, int max_iters)
 
                 myBarrier.wait();
             }
-        }, start, eachWorkload + ((leftOver > 0) ? 1 : 0));
-        start += eachWorkload + ((leftOver > 0) ? 1 : 0);
+        }, start, eachWorkload + carryOver);
+        start += eachWorkload + carryOver;
         if(leftOver > 0) leftOver--;
     }
 
