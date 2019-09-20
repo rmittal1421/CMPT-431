@@ -5,6 +5,7 @@
 #include <future>
 #include "utils.h"
 #include "graph.h"
+#include <string.h>
 
 uintV countTriangles(uintV *array1, uintE len1, uintV *array2, uintE len2, uintV u, uintV v)
 {
@@ -34,7 +35,7 @@ uintV countTriangles(uintV *array1, uintE len1, uintV *array2, uintE len2, uintV
     return count;
 }
 
-void triangleCountSerial(Graph &g)
+void triangleCountParallel(Graph &g, uint &n_workers)
 {
     uintV n = g.n_;
     long triangle_count = 0;
@@ -45,14 +46,18 @@ void triangleCountSerial(Graph &g)
 
     // Create threads and distribute the work across T threads
     // -------------------------------------------------------------------
-    std::future<uintV> futureList[4];
-    uintV start = 0, eachWorkload = n/4, leftOver = n%4;
+    std::future<uintV> futureList[n_workers];
+    uintV start = 0, eachWorkload = n/n_workers, leftOver = n%n_workers;
 
+    std::cout << "thread_id, triangle_count, time_taken\n";
     t1.start();
+
     // Process each edge <u,v>
-    for(int i = 0; i < 4; i++) {
+    for(int i = 0; i < n_workers; i++) {
         uintV carryOver = (leftOver > 0) ? 1 : 0;
-        futureList[i] = std::async (std::launch::async, [&](uintV s, uintV workload){
+        futureList[i] = std::async (std::launch::async, [&](uintV s, uintV workload, int iteration){
+            timer threadTimer;
+            threadTimer.start();
             uintV local_count = 0;
             for (uintV u = s; u < (s + workload); u++)
             {
@@ -69,8 +74,15 @@ void triangleCountSerial(Graph &g)
                                                     v);
                 }
             }
+            std::string threadInfo = std::to_string(iteration) 
+                                     + ", "
+                                     + std::to_string(local_count) 
+                                     + ", "
+                                     + std::to_string(threadTimer.stop())
+                                     + "\n";
+            std::cout << threadInfo;
             return local_count;
-        }, start, eachWorkload + carryOver);
+        }, start, eachWorkload + carryOver, i);
         start += eachWorkload + carryOver;
         if(leftOver > 0) leftOver--;
     }
@@ -81,7 +93,6 @@ void triangleCountSerial(Graph &g)
     time_taken = t1.stop();
     // -------------------------------------------------------------------
     // Here, you can just print the number of non-unique triangles counted by each thread
-    // std::cout << "thread_id, triangle_count, time_taken\n";
     // Print the above statistics for each thread
     // Example output for 2 threads:
     // thread_id, triangle_count, time_taken
@@ -113,7 +124,7 @@ int main(int argc, char *argv[])
     g.read_graph_from_binary<int>(input_file_path);
     std::cout << "Created graph\n";
 
-    triangleCountSerial(g);
+    triangleCountParallel(g, n_workers);
 
     return 0;
 }

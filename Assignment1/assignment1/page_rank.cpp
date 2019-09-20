@@ -103,7 +103,6 @@ int main(int argc, char *argv[])
 
     Graph g;
     std::cout << "Reading graph\n";
-    std::cout<<"Page rank serial"<<std::endl;
     g.read_graph_from_binary<int>(input_file_path);
     std::cout << "Created graph\n";
     pageRankSerial(g, max_iterations);
