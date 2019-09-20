@@ -69,8 +69,7 @@ void pageRankParallelAtomic(Graph &g, int max_iters, uint &n_workers)
                         uintV v = g.vertices_[u].getOutNeighbor(i);
 
                         PageRankType current_val = pr_next[v];
-                        while(!pr_next[v].compare_exchange_weak(current_val, current_val + (pr_curr[u]/out_degree), std::memory_order_release,
-                                        std::memory_order_relaxed));
+                        while(!pr_next[v].compare_exchange_weak(current_val, current_val + (pr_curr[u]/out_degree)));
                     }
                 }
 
