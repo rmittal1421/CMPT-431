@@ -174,6 +174,8 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
     uintV n = g.n_;
     uintE m = g.m_;
 
+    timer t1;
+    t1.start();
     std::vector<intPair> range_of_vertices(n_workers);
     uint max_workload = m/n_workers, current_sum = 0, current_thread = 0;
     int start = 0;
@@ -204,7 +206,7 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
     }
 
     // Push based pagerank
-    timer t1;
+    // timer t1;
     double time_taken = 0.0;
     // Create threads and distribute the work across T threads
     // -------------------------------------------------------------------
@@ -212,7 +214,7 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
     CustomBarrier myBarrier(n_workers);
 
     std::cout << "thread_id, time_taken\n";
-    t1.start();
+    // t1.start();
 
     for(int i = 0; i < n_workers; i++) {
         threadList[i] = std::thread ([&](int iteration) {
