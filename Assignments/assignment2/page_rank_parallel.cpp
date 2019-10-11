@@ -17,6 +17,7 @@
 #define CHANGE_IN_PAGE_RANK(x, y) std::abs(x - y)
 typedef int64_t PageRankType;
 typedef std::atomic<PageRankType> AtomicPageRankType;
+typedef std::atomic<uintV> AtomicInteger;
 #else
 #define INIT_PAGE_RANK 1.0
 #define EPSILON 0.01
@@ -25,6 +26,7 @@ typedef std::atomic<PageRankType> AtomicPageRankType;
 #define CHANGE_IN_PAGE_RANK(x, y) std::fabs(x - y)
 typedef float PageRankType;
 typedef std::atomic<PageRankType> AtomicPageRankType;
+typedef std::atomic<uintV> AtomicInteger;
 #endif
 
 void pageRankSerial(Graph &g, int max_iters)
@@ -95,22 +97,26 @@ void pageRankParallelVertex(Graph &g, int max_iters, uint &n_workers)
     }
 
     // Push based pagerank
-    timer t1;
-    double time_taken = 0.0;
+    timer t1, t2;
+    double time_taken = 0.0, partitioning_time_taken = 0.0;
     // Create threads and distribute the work across T threads
     // -------------------------------------------------------------------
     std::thread threadList[n_workers];
     CustomBarrier myBarrier(n_workers);
     std::vector<std::mutex> mutex_vector(n);
-    uintV start = 0, eachWorkload = n/n_workers, leftOver = n % n_workers;
 
-    std::cout << "thread_id, time_taken\n";
+    std::cout << "thread_id, num_vertices, num_edges, barrier1_time, barrier2_time, getNextVertex_time, total_time\n";
     t1.start();
+    
+    t2.start();
+    uintV start = 0, eachWorkload = n/n_workers, leftOver = n % n_workers, carryOver = (leftOver > 0) ? 1 : 0;
+    partitioning_time_taken += t2.stop();
 
     for(int i = 0; i < n_workers; i++) {
-        uintV carryOver = (leftOver > 0) ? 1 : 0;
         threadList[i] = std::thread ([&](uintV s, uintV workload, int iteration) {
-            timer threadTimer;
+            timer threadTimer, b1_timer, b2_timer;
+            double barrier1_time = 0.0, barrier2_time = 0.0;
+            uint num_vertices = 0, num_edges = 0;
             threadTimer.start();
 
             for (int iter = 0; iter < max_iters; iter++) {
@@ -118,6 +124,7 @@ void pageRankParallelVertex(Graph &g, int max_iters, uint &n_workers)
                 for (uintV u = s; u < (s + workload); u++)
                 {
                     uintE out_degree = g.vertices_[u].getOutDegree();
+                    num_edges += out_degree;
                     for (uintE i = 0; i < out_degree; i++)
                     {
                         uintV v = g.vertices_[u].getOutNeighbor(i);
@@ -127,10 +134,13 @@ void pageRankParallelVertex(Graph &g, int max_iters, uint &n_workers)
                     }
                 }
 
+                b1_timer.start();
                 myBarrier.wait();
+                barrier1_time += b1_timer.stop();
 
                 for (uintV v = s; v < (s + workload); v++)
                 {
+                    num_vertices++;
                     pr_next[v] = PAGE_RANK(pr_next[v]);
 
                     // reset pr_curr for the next iteration
@@ -138,13 +148,25 @@ void pageRankParallelVertex(Graph &g, int max_iters, uint &n_workers)
                     pr_next[v] = 0.0;
                 }
 
+                b2_timer.start();
                 myBarrier.wait();
+                barrier2_time += b2_timer.stop();
             }
-            std::string threadInfo = std::to_string(iteration) + ", " + std::to_string(threadTimer.stop()) + "\n";
+            std::string threadInfo = std::to_string(iteration) + ", " + 
+                                     std::to_string(num_vertices) + ", " + 
+                                     std::to_string(num_edges) + ", " + 
+                                     std::to_string(barrier1_time) + ", " + 
+                                     std::to_string(barrier2_time) + ", " + 
+                                     std::to_string(0) + ", " + 
+                                     std::to_string(threadTimer.stop()) + "\n";
             std::cout << threadInfo;
         }, start, eachWorkload + carryOver, i);
+
+        t2.start();
         start += eachWorkload + carryOver;
         if(leftOver > 0) leftOver--;
+        carryOver = (leftOver > 0) ? 1 : 0;
+        partitioning_time_taken += t2.stop();
     }
 
     for(auto &t : threadList) {
@@ -164,6 +186,7 @@ void pageRankParallelVertex(Graph &g, int max_iters, uint &n_workers)
         sum_of_page_ranks += pr_curr[u];
     }
     std::cout << "Sum of page rank : " << sum_of_page_ranks << "\n";
+    std::cout << "Partitioning time (in seconds) : " << partitioning_time_taken << "\n";
     std::cout << "Time taken (in seconds) : " << time_taken << "\n";
     delete[] pr_curr;
     delete[] pr_next;
@@ -173,28 +196,6 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
 {
     uintV n = g.n_;
     uintE m = g.m_;
-
-    timer t1;
-    t1.start();
-    std::vector<intPair> range_of_vertices(n_workers);
-    uint max_workload = m/n_workers, current_sum = 0, current_thread = 0;
-    int start = 0;
-    for(uintV u = 0; u < n; u++) {
-        if(current_thread == n_workers - 1) {
-            range_of_vertices[current_thread] = {start, n-1};
-            break;
-        }
-        uintE out_degree = g.vertices_[u].getOutDegree();
-        if(current_sum == 0) current_sum += out_degree;
-        else if(current_sum + out_degree <= max_workload) current_sum += out_degree;
-        else {
-            current_sum = 0;
-            range_of_vertices[current_thread] = {start, u - 1};
-            start = u;
-            u--;
-            current_thread++;
-        }
-    }
 
     PageRankType *pr_curr = new PageRankType[n];
     AtomicPageRankType *pr_next = new AtomicPageRankType[n];
@@ -206,27 +207,52 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
     }
 
     // Push based pagerank
-    // timer t1;
-    double time_taken = 0.0;
+    timer t1, t2;
+    double time_taken = 0.0, partitioning_time_taken = 0.0;
     // Create threads and distribute the work across T threads
     // -------------------------------------------------------------------
     std::thread threadList[n_workers];
     CustomBarrier myBarrier(n_workers);
+    std::vector<intPair> range_of_vertices(n_workers, {0, 0});
 
-    std::cout << "thread_id, time_taken\n";
-    // t1.start();
+    std::cout << "thread_id, num_vertices, num_edges, barrier1_time, barrier2_time, getNextVertex_time, total_time\n";
+    t1.start(); t2.start();
+
+    uint max_workload = m/n_workers, current_sum = 0, current_thread = 0;
+    int start = 0;
+    for(uintV u = 0; u < n; u++) {
+        if(current_thread == n_workers - 1) {
+            range_of_vertices[current_thread] = {start, n};
+            break;
+        }
+        uintE out_degree = g.vertices_[u].getOutDegree();
+        if(current_sum == 0) current_sum += out_degree;
+        else if(current_sum + out_degree <= max_workload) current_sum += out_degree;
+        else {
+            current_sum = 0;
+            range_of_vertices[current_thread] = {start, u};
+            start = u;
+            u--;
+            current_thread++;
+        }
+    }
+
+    partitioning_time_taken += t2.stop();
 
     for(int i = 0; i < n_workers; i++) {
         threadList[i] = std::thread ([&](int iteration) {
-            timer threadTimer;
+            timer threadTimer, b1_timer, b2_timer;
+            double barrier1_time = 0.0, barrier2_time = 0.0;
+            uint num_vertices = 0, num_edges = 0;
             threadTimer.start();
 
             for (int iter = 0; iter < max_iters; iter++) {
                 // for each vertex 'u', process all its outNeighbors 'v'
                 auto range_values = range_of_vertices[iteration];
-                for (uintV u = range_values.first; u <= range_values.second; u++)
+                for (uintV u = range_values.first; u < range_values.second; u++)
                 {
                     uintE out_degree = g.vertices_[u].getOutDegree();
+                    num_edges += out_degree;
                     for (uintE i = 0; i < out_degree; i++)
                     {
                         uintV v = g.vertices_[u].getOutNeighbor(i);
@@ -236,9 +262,13 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
                     }
                 }
 
+                b1_timer.start();
                 myBarrier.wait();
-                for (uintV v = range_values.first; v <= range_values.second; v++)
+                barrier1_time += b1_timer.stop();
+
+                for (uintV v = range_values.first; v < range_values.second; v++)
                 {
+                    num_vertices++;
                     pr_next[v] = PAGE_RANK(pr_next[v]);
 
                     // reset pr_curr for the next iteration
@@ -246,9 +276,136 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
                     pr_next[v] = 0.0;
                 }
 
+                b2_timer.start();
                 myBarrier.wait();
+                barrier2_time += b2_timer.stop();
             }
-            std::string threadInfo = std::to_string(iteration) + ", " + std::to_string(threadTimer.stop()) + "\n";
+            std::string threadInfo = std::to_string(iteration) + ", " + 
+                                     std::to_string(num_vertices) + ", " + 
+                                     std::to_string(num_edges) + ", " + 
+                                     std::to_string(barrier1_time) + ", " + 
+                                     std::to_string(barrier2_time) + ", " + 
+                                     std::to_string(0) + ", " + 
+                                     std::to_string(threadTimer.stop()) + "\n";
+            std::cout << threadInfo;
+        }, i);
+    }
+
+    for(auto &t : threadList) {
+        t.join();
+    }
+
+    time_taken = t1.stop();
+    // -------------------------------------------------------------------
+    // Print the above statistics for each thread
+    // Example output for 2 threads:
+    // thread_id, time_taken
+    // 0, 0.12
+    // 1, 0.12
+
+    PageRankType sum_of_page_ranks = 0;
+    for (uintV u = 0; u < n; u++){
+        sum_of_page_ranks += pr_curr[u];
+    }
+    std::cout << "Sum of page rank : " << sum_of_page_ranks << "\n";
+    std::cout << "Partitioning time (in seconds) : " << partitioning_time_taken << "\n";
+    std::cout << "Time taken (in seconds) : " << time_taken << "\n";
+    delete[] pr_curr;
+    delete[] pr_next;
+}
+
+void pageRankParallelDynamic(Graph &g, int max_iters, uint &n_workers, uint &granularity)
+{
+    uintV n = g.n_;
+
+    PageRankType *pr_curr = new PageRankType[n];
+    AtomicPageRankType *pr_next = new AtomicPageRankType[n];
+
+    for (uintV i = 0; i < n; i++)
+    {
+        pr_curr[i] = INIT_PAGE_RANK;
+        pr_next[i] = 0.0;
+    }
+
+    // Push based pagerank
+    timer t1;
+    double time_taken = 0.0;
+    // Create threads and distribute the work across T threads
+    // -------------------------------------------------------------------
+    std::thread threadList[n_workers];
+    CustomBarrier myBarrier(n_workers);
+    AtomicInteger index1(0), index2(0);
+
+    std::cout << "thread_id, num_vertices, num_edges, barrier1_time, barrier2_time, getNextVertex_time, total_time\n";
+    t1.start();
+
+    for(int i = 0; i < n_workers; i++) {
+        threadList[i] = std::thread ([&](int iteration) {
+            timer threadTimer, b1_timer, b2_timer, getNextVertex_timer;
+            double barrier1_time = 0, barrier2_time = 0, getNextVertex_time = 0;
+            uint num_vertices = 0.0, num_edges = 0.0;
+            threadTimer.start();
+
+            for (int iter = 0; iter < max_iters; iter++) {
+                // for each vertex 'u', process all its outNeighbors 'v'
+                while(true) {
+                    //Get the vertex to be processed next.
+                    getNextVertex_timer.start();
+                    uintV start = index1.fetch_add(1) * granularity;
+                    getNextVertex_time += getNextVertex_timer.stop();
+
+                    // start *= granularity;
+                    if(start >= n) break;
+                    
+                    for (uintV u = start; (u < start + granularity) && (u < n); u++) {
+                        uintE out_degree = g.vertices_[u].getOutDegree();
+                        num_edges += out_degree;
+                        for (uintE i = 0; i < out_degree; i++)
+                        {
+                            uintV v = g.vertices_[u].getOutNeighbor(i);
+
+                            PageRankType current_val = pr_next[v];
+                            while(!pr_next[v].compare_exchange_weak(current_val, current_val + (pr_curr[u]/out_degree)));
+                        }
+                    }
+                }
+
+                index2 = 0;
+                b1_timer.start();
+                myBarrier.wait();
+                barrier1_time += b1_timer.stop();
+
+                while(true) {
+                    //Get the vertex to be update.
+                    getNextVertex_timer.start();
+                    uintV start = index2.fetch_add(1) * granularity;
+                    getNextVertex_time += getNextVertex_timer.stop();
+
+                    // start *= granularity;
+                    if(start >= n) break; 
+
+                    for (uintV v = start; (v < start + granularity) && (v < n); v++) {
+                        num_vertices++;
+                        pr_next[v] = PAGE_RANK(pr_next[v]);
+
+                        // reset pr_curr for the next iteration
+                        pr_curr[v] = pr_next[v];
+                        pr_next[v] = 0.0;
+                    }
+                }
+                
+                index1 = 0;
+                b2_timer.start();
+                myBarrier.wait();
+                barrier2_time += b2_timer.stop();
+            }
+            std::string threadInfo = std::to_string(iteration) + ", " + 
+                                     std::to_string(num_vertices) + ", " + 
+                                     std::to_string(num_edges) + ", " + 
+                                     std::to_string(barrier1_time) + ", " + 
+                                     std::to_string(barrier2_time) + ", " + 
+                                     std::to_string(getNextVertex_time) + ", " + 
+                                     std::to_string(threadTimer.stop()) + "\n";
             std::cout << threadInfo;
         }, i);
     }
@@ -324,6 +481,7 @@ int main(int argc, char *argv[])
         break;
     case 3:
         std::cout << "\nDynamic work partitioning\n";
+        pageRankParallelDynamic(g, max_iterations, n_workers, granularity);
         break;
     default:
         break;
