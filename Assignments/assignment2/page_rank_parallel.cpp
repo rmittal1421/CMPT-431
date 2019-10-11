@@ -296,12 +296,6 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
     }
 
     time_taken = t1.stop();
-    // -------------------------------------------------------------------
-    // Print the above statistics for each thread
-    // Example output for 2 threads:
-    // thread_id, time_taken
-    // 0, 0.12
-    // 1, 0.12
 
     PageRankType sum_of_page_ranks = 0;
     for (uintV u = 0; u < n; u++){
