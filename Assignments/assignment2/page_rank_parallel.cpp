@@ -107,7 +107,7 @@ void pageRankParallelVertex(Graph &g, int max_iters, uint &n_workers)
 
     std::cout << "thread_id, num_vertices, num_edges, barrier1_time, barrier2_time, getNextVertex_time, total_time\n";
     t1.start();
-    
+
     t2.start();
     uintV start = 0, eachWorkload = n/n_workers, leftOver = n % n_workers, carryOver = (leftOver > 0) ? 1 : 0;
     partitioning_time_taken += t2.stop();
@@ -329,7 +329,7 @@ void pageRankParallelDynamic(Graph &g, int max_iters, uint &n_workers, uint &gra
 
     // Push based pagerank
     timer t1;
-    double time_taken = 0.0;
+    double time_taken = 0.0, partitioning_time_taken = 0.0;
     // Create threads and distribute the work across T threads
     // -------------------------------------------------------------------
     std::thread threadList[n_workers];
@@ -427,6 +427,7 @@ void pageRankParallelDynamic(Graph &g, int max_iters, uint &n_workers, uint &gra
         sum_of_page_ranks += pr_curr[u];
     }
     std::cout << "Sum of page rank : " << sum_of_page_ranks << "\n";
+    std::cout << "Partitioning time (in seconds) : " << partitioning_time_taken << "\n";
     std::cout << "Time taken (in seconds) : " << time_taken << "\n";
     delete[] pr_curr;
     delete[] pr_next;
