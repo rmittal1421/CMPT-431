@@ -351,10 +351,10 @@ void pageRankParallelDynamic(Graph &g, int max_iters, uint &n_workers, uint &gra
                 while(true) {
                     //Get the vertex to be processed next.
                     getNextVertex_timer.start();
-                    uintV start = index1.fetch_add(1) * granularity;
+                    uintV start = index1.fetch_add(1);
                     getNextVertex_time += getNextVertex_timer.stop();
 
-                    // start *= granularity;
+                    start *= granularity;
                     if(start >= n) break;
                     
                     for (uintV u = start; (u < start + granularity) && (u < n); u++) {
@@ -378,10 +378,10 @@ void pageRankParallelDynamic(Graph &g, int max_iters, uint &n_workers, uint &gra
                 while(true) {
                     //Get the vertex to be update.
                     getNextVertex_timer.start();
-                    uintV start = index2.fetch_add(1) * granularity;
+                    uintV start = index2.fetch_add(1);
                     getNextVertex_time += getNextVertex_timer.stop();
 
-                    // start *= granularity;
+                    start *= granularity;
                     if(start >= n) break; 
 
                     for (uintV v = start; (v < start + granularity) && (v < n); v++) {
