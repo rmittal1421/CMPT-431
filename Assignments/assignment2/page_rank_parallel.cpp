@@ -226,9 +226,7 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
             break;
         }
         uintE out_degree = g.vertices_[u].getOutDegree();
-        std::cout<<u<<" "<<out_degree<<std::endl;
-        if(current_sum == 0) current_sum += out_degree;
-        else if(current_sum + out_degree <= max_workload) current_sum += out_degree;
+        if(current_sum + out_degree <= max_workload) current_sum += out_degree;
         else {
             current_sum = 0;
             range_of_vertices[current_thread] = {start, u};
@@ -237,11 +235,6 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
             current_thread++;
         }
     }
-
-    for(auto p: range_of_vertices) {
-        std::cout<<p.first<<" "<<p.second<<std::endl;
-    }
-    // return;
 
     partitioning_time_taken += t2.stop();
 
