@@ -226,8 +226,7 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
             break;
         }
         uintE out_degree = g.vertices_[u].getOutDegree();
-        if(current_sum == 0) current_sum += out_degree;
-        else if(current_sum + out_degree <= max_workload) current_sum += out_degree;
+        if(current_sum + out_degree <= max_workload) current_sum += out_degree;
         else {
             current_sum = 0;
             range_of_vertices[current_thread] = {start, u};
