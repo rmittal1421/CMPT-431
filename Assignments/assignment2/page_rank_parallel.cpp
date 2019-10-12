@@ -237,6 +237,11 @@ void pageRankParallelEdge(Graph &g, int max_iters, uint &n_workers)
         }
     }
 
+    for(auto p: range_of_vertices) {
+        std::cout<<p.first<<" "<<p.second<<std::endl;
+    }
+    return;
+
     partitioning_time_taken += t2.stop();
 
     for(int i = 0; i < n_workers; i++) {
