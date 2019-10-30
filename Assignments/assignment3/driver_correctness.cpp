@@ -124,10 +124,17 @@ struct ConsumerWithOutput
                 my_output_[count] = value;
                 count++;
             }
-            else
+            else if (producers_finished_->load() == n_producers_)
             {
-                if (producers_finished_->load() == n_producers_)
+                if (my_queue.dequeue(&value))
+                {
+                    my_output_[count] = value;
+                    count++;
+                }
+                else
+                {
                     break;
+                }
             }
         }
         *processed_elements_ = count;
