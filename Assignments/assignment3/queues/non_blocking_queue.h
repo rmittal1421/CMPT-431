@@ -80,19 +80,19 @@ public:
             if(tail.ptr == q_tail.ptr) {
                 if(next.address() == nullptr) {
                     // CAS operation
-                    if(CAS(&tail.address()->next, next, pointer_t(node, next.count() + 1))) {
+                    if(CAS(&tail.address()->next, next, pointer_t<Node<T>>(node, next.count() + 1))) {
                         break;
                     }
                 } else {
                     // CAS operation
-                    CAS(&q_tail, tail, pointer_t(next.address(), tail.count() + 1));
+                    CAS(&q_tail, tail, pointer_t<Node<T>>(next.address(), tail.count() + 1));
                 }
             }
         }
 
         SFENCE;
         // CAS operation
-        CAS(&q_tail, tail, pointer_t(node, tail.count() + 1));
+        CAS(&q_tail, tail, pointer_t<Node<T>>(node, tail.count() + 1));
     }
 
     bool dequeue(T *value)
@@ -114,10 +114,10 @@ public:
                     if(next.address() == nullptr) {
                         return false;
                     }
-                    CAS(&q_tail, tail, pointer_t(next.address(), tail.count() + 1));
+                    CAS(&q_tail, tail, pointer_t<Node<T>>(next.address(), tail.count() + 1));
                 } else {
                     *value = next.address()->value;
-                    if(CAS(&q_head, head, pointer_t(next.address(), head.count() + 1))) {
+                    if(CAS(&q_head, head, pointer_t<Node<T>>(next.address(), head.count() + 1))) {
                         break;
                     }
                 }
