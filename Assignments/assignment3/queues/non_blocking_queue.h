@@ -11,7 +11,7 @@ class pointer_t {
 
         P* address() {
             ptr = (P*) ((uintptr_t)ptr << 16);
-            ptr = (P*) (uintptr_t)ptr >> 16;
+            ptr = (P*) ((uintptr_t)ptr >> 16);
             return ptr;
         }
 
