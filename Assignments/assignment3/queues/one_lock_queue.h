@@ -57,8 +57,8 @@ public:
         }
         *value = new_head->value;
         q_head = new_head;
-        my_allocator_.freeNode(node);
         lock.unlock();
+        my_allocator_.freeNode(node);
         return true;
     }
 
