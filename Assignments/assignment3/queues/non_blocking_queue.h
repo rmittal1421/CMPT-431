@@ -31,7 +31,7 @@ class pointer_t {
             return count;
         }
 
-        bool operator== (pointer_t lhs, pointer_t rhs) {
+        bool operator== (pointer_t<P> lhs, pointer_t<P> rhs) {
             return lhs.ptr == rhs.ptr;
         }
 
