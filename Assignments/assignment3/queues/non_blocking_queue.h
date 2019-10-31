@@ -47,7 +47,7 @@ public:
         my_allocator_.initialize(t_my_allocator_size, sizeof(Node<T>));
         // Initialize the queue head or tail here
         Node<T>* newNode = (Node<T>*)my_allocator_.newNode();
-        newNode->next = nullptr;
+        newNode->next.ptr = nullptr;
         q_head.ptr = newNode;
         q_tail.ptr = newNode;
         // my_allocator_.freeNode(newNode);
@@ -67,7 +67,7 @@ public:
         while(true) {
             tail = q_tail;
             LFENCE;
-            pointer_t<Node<T>> = tail.address()->next;
+            pointer_t<Node<T>> next = tail.address()->next;
             LFENCE;
             if(tail == q_tail) {
                 if(next.address() == nullptr) {
