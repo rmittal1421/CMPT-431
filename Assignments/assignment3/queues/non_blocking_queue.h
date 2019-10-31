@@ -21,9 +21,9 @@ class pointer_t {
         }
 
         P* address() {
-            ptr = (P*) ((uintptr_t)ptr << 16);
-            ptr = (P*) ((uintptr_t)ptr >> 16);
-            return ptr;
+            P* to_return_ptr = (P*) ((uintptr_t)ptr << 16);
+            to_return_ptr = (P*) ((uintptr_t)to_return_ptr >> 16);
+            return to_return_ptr;
         }
 
         uint count() {
