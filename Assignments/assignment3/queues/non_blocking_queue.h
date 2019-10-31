@@ -31,6 +31,10 @@ class pointer_t {
             return count;
         }
 
+        bool operator== (pointer_t lhs, pointer_t rhs) {
+            return lhs.ptr == rhs.ptr;
+        }
+
         // P generateObject
 };
 
@@ -82,7 +86,7 @@ public:
             LFENCE;
             pointer_t<Node<T>> next = tail.address()->next;
             LFENCE;
-            if(tail.ptr == q_tail.ptr) {
+            if(tail == q_tail) {
                 std::cout << "I am coming here" << std::endl;
                 if(next.address() == nullptr) {
                     // CAS operation
@@ -115,7 +119,7 @@ public:
             pointer_t<Node<T>> next = head.address()->next;
             LFENCE;
 
-            if(head.ptr == q_head.ptr) {
+            if(head == q_head) {
                 if(head.address() == tail.address()) {
                     if(next.address() == nullptr) {
                         return false;
