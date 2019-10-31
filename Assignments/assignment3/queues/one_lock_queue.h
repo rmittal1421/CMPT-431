@@ -36,12 +36,12 @@ public:
     void enqueue(T value)
     {
         Node<T>* newNode = (Node<T>*)my_allocator_.newNode();
-        node->value = value;
-        node->next = nullptr;
+        newNode->value = value;
+        newNode->next = nullptr;
 
         lock.lock();
-        q_tail->next = node;
-        q_tail = node;
+        q_tail->next = newNode;
+        q_tail = newNode;
         lock.unlock();
     }
 
@@ -58,7 +58,7 @@ public:
         q_head = new_head;
         my_allocator_.freeNode(node);
         lock.unlock();
-        return ret_value;
+        return true;
     }
 
     void cleanup()
