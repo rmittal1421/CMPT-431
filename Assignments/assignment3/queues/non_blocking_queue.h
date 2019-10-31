@@ -10,13 +10,13 @@ class pointer_t {
         P* ptr;
 
         P* address() {
-            ptr = ptr << 16;
-            ptr = ptr >> 16;
+            ptr = (uintptr_t)ptr << 16;
+            ptr = (uintptr_t)ptr >> 16;
             return ptr;
         }
 
         uint count() {
-            uint count = ptr >> 48;
+            uint count = (uintptr_t)ptr >> 48;
             return count;
         }
 };
