@@ -10,8 +10,8 @@ class pointer_t {
         P* ptr;
 
         P* address() {
-            ptr = ptr << (64 - 48);
-            ptr = ptr >> (64 - 48);
+            ptr = ptr << 16;
+            ptr = ptr >> 16;
             return ptr;
         }
 
@@ -69,7 +69,7 @@ public:
             LFENCE;
             pointer_t<Node<T>> next = tail.address()->next;
             LFENCE;
-            if(tail == q_tail) {
+            if(tail.ptr == q_tail.ptr) {
                 if(next.address() == nullptr) {
                     // CAS operation
                     if(CAS(&tail.address()->next, next, <node, next.count() + 1>)) {
@@ -101,7 +101,7 @@ public:
             pointer_t<Node<T>> next = head.address()->next;
             LFENCE;
 
-            if(head == q_head) {
+            if(head.ptr == q_head.ptr) {
                 if(head.address() == tail.address()) {
                     if(next.address() == nullptr) {
                         return false;
