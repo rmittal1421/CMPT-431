@@ -83,6 +83,7 @@ public:
             pointer_t<Node<T>> next = tail.address()->next;
             LFENCE;
             if(tail.ptr == q_tail.ptr) {
+                std::cout << "I am coming here" << std::endl;
                 if(next.address() == nullptr) {
                     // CAS operation
                     if(CAS(&tail.address()->next, next, pointer_t<Node<T>>(node, next.count() + 1))) {
