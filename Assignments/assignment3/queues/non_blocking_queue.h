@@ -16,7 +16,7 @@ class pointer_t {
         }
 
         uint count() {
-            uint count = (uint) (uintptr_t)ptr >> 48;
+            uint count = (uintptr_t)ptr >> 48;
             return count;
         }
 };
