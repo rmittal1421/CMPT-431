@@ -4,8 +4,9 @@
 template <class T>
 class Node
 {
-    T value;
-    Node<T>* next;
+    public:
+        T value;
+        Node<T>* next;
 };
 
 template <class T>
