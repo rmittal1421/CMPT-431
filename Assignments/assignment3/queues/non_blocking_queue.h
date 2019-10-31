@@ -9,6 +9,9 @@ class pointer_t {
     public:
         P* ptr;
 
+        pointer_t() {
+        }
+
         pointer_t(P* pointer, uint64_t counter) {
             // Put the counter's value in the pointer first.
             // Shift 48 bits to the right
@@ -27,6 +30,8 @@ class pointer_t {
             uint64_t count = (uintptr_t)ptr >> 48;
             return count;
         }
+
+        // P generateObject
 };
 
 template <class T>
