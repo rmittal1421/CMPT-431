@@ -6,19 +6,20 @@
 
 template<class P>
 class pointer_t {
-    P* ptr;
+    public:
+        P* ptr;
 
-    P* address() {
-        ptr = ptr << (64 - 48);
-        ptr = ptr >> (64 - 48);
-        return ptr;
-    }
+        P* address() {
+            ptr = ptr << (64 - 48);
+            ptr = ptr >> (64 - 48);
+            return ptr;
+        }
 
-    uint count() {
-        uint count = ptr >> 48;
-        return count;
-    }
-}
+        uint count() {
+            uint count = ptr >> 48;
+            return count;
+        }
+};
 
 template <class T>
 class Node
@@ -47,8 +48,8 @@ public:
         // Initialize the queue head or tail here
         Node<T>* newNode = (Node<T>*)my_allocator_.newNode();
         newNode->next = nullptr;
-        q_head = newNode;
-        q_tail = newNode;
+        q_head.ptr = newNode;
+        q_tail.ptr = newNode;
         // my_allocator_.freeNode(newNode);
     }
 
@@ -56,17 +57,17 @@ public:
     {
         // Use LFENCE and RFENCE as mentioned in pseudocode
 
-        Node<T>* node = (Node<T>* )my_allocator.newNode();
+        Node<T>* node = (Node<T>* )my_allocator_.newNode();
         node->value = value;
         node->next.ptr = nullptr;
 
-        Node<T>* tail = nullptr;
         SFENCE;
+        pointer_t<Node<T>> tail;
 
         while(true) {
             tail = q_tail;
             LFENCE;
-            Node<T>* next = tail.address()->next;
+            pointer_t<Node<T>> = tail.address()->next;
             LFENCE;
             if(tail == q_tail) {
                 if(next.address() == nullptr) {
@@ -89,13 +90,15 @@ public:
     bool dequeue(T *value)
     {
         // Use LFENCE and RFENCE as mentioned in pseudocode
+
+        pointer_t<Node<T>> head;
         
         while(true) {
-            Node<T>* head = q_head;
+            head = q_head;
             LFENCE;
-            Node<T>* tail = q_tail;
+            pointer_t<Node<T>> tail = q_tail;
             LFENCE;
-            next = head.address()->next;
+            pointer_t<Node<T>> next = head.address()->next;
             LFENCE;
 
             if(head == q_head) {
