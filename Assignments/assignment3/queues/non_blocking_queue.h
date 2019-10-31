@@ -10,8 +10,8 @@ class pointer_t {
         P* ptr;
 
         P* address() {
-            ptr = (Node<T>*) ((uintptr_t)ptr << 16);
-            ptr = (Node<T>*) (uintptr_t)ptr >> 16;
+            ptr = (P*) ((uintptr_t)ptr << 16);
+            ptr = (P*) (uintptr_t)ptr >> 16;
             return ptr;
         }
 
