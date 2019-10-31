@@ -31,8 +31,8 @@ class pointer_t {
             return count;
         }
 
-        bool operator== (pointer_t<P> lhs, pointer_t<P> rhs) {
-            return lhs.ptr == rhs.ptr;
+        bool operator== (pointer_t<P> other) {
+            return this->ptr == other.ptr;
         }
 
         // P generateObject
