@@ -9,6 +9,12 @@ class pointer_t {
     public:
         P* ptr;
 
+        pointer_t(P* pointer, uint counter) {
+            // Put the counter's value in the pointer first.
+            // Shift 48 bits to the right
+            // Place the pointer then and cast it
+        }
+
         P* address() {
             ptr = (P*) ((uintptr_t)ptr << 16);
             ptr = (P*) ((uintptr_t)ptr >> 16);
