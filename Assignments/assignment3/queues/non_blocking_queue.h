@@ -10,13 +10,14 @@ class pointer_t {
         P* ptr;
 
         pointer_t() {
+            ptr = nullptr;
         }
 
         pointer_t(P* pointer, uint64_t counter) {
             // Put the counter's value in the pointer first.
             // Shift 48 bits to the right
             // Place the pointer then and cast it
-            // ptr = (P*) (counter << 48);
+
             ptr = (P*) ((counter << 48) | (uintptr_t)pointer);
         }
 
