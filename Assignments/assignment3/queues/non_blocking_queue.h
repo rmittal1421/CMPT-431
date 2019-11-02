@@ -17,26 +17,20 @@ class pointer_t {
             // Put the counter's value in the pointer first.
             // Shift 48 bits to the right
             // Place the pointer then and cast it
-
             ptr = (P*) ((counter << 48) | (uintptr_t)pointer);
         }
 
         P* address() {
-            P* to_return_ptr = (P*) ((uintptr_t)ptr << 16);
-            to_return_ptr = (P*) ((uintptr_t)to_return_ptr >> 16);
-            return to_return_ptr;
+            return (P*) (((uintptr_t)ptr << 16) >> 16);
         }
 
         uint count() {
-            uint64_t count = (uintptr_t)ptr >> 48;
-            return count;
+            return (uintptr_t)ptr >> 48;
         }
 
         bool operator== (pointer_t<P> other) {
             return this->ptr == other.ptr;
         }
-
-        // P generateObject
 };
 
 template <class T>
@@ -68,13 +62,10 @@ public:
         newNode->next.ptr = nullptr;
         q_head.ptr = newNode;
         q_tail.ptr = newNode;
-        // my_allocator_.freeNode(newNode);
     }
 
     void enqueue(T value)
     {
-        // Use LFENCE and RFENCE as mentioned in pseudocode
-
         Node<T>* node = (Node<T>* )my_allocator_.newNode();
         node->value = value;
         node->next.ptr = nullptr;
@@ -107,8 +98,6 @@ public:
 
     bool dequeue(T *value)
     {
-        // Use LFENCE and RFENCE as mentioned in pseudocode
-
         pointer_t<Node<T>> head;
         
         while(true) {
