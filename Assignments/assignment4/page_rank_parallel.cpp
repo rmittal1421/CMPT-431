@@ -119,11 +119,21 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
             }
         }
 
-        if(i == world_rank) {
+        if(i == ROOT_PROCESSOR) {
             start_indices[i] = start_vertex;
+        }
+
+        if(i == world_rank && i != ROOT_PROCESSOR) {
             break;
         }
     }
+
+    if(world_rank == ROOT_PROCESSOR) {
+        for(int i = 0; i < P; i++) {
+            std::cout << start_indices[i] << " ";
+        }
+        std::cout<<std::endl;
+    } 
 
     // Push based pagerank
     // -------------------------------------------------------------------
@@ -136,7 +146,7 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
     if(world_rank == ROOT_PROCESSOR) {
         // buffer = new PageRankType[n];
         buffer = (PageRankType*) malloc(sizeof(PageRankType) * n);
-        starter = &buffer[end_vertex];
+        starter = &pr_next[end_vertex];
     } else {
         buffer = (PageRankType*) malloc(sizeof(PageRankType) * (end_vertex - start_vertex));
         // buffer = new PageRankType[end_vertex - start_vertex];
@@ -170,19 +180,17 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
             // First receives from everyone and then send to everyone
 
             for(int i = 1; i < P; i++) {
-                printf("Receiving at root from processor : %d\n", i);
+
                 MPI_Recv(
                 /* data         = */ buffer, 
                 /* count        = */ n, 
-                /* datatype     = */ MPI_INT64_T, 
+                /* datatype     = */ PAGERANK_MPI_TYPE, 
                 /* source       = */ i, 
                 /* tag          = */ 0, 
                 /* communicator = */ MPI_COMM_WORLD, 
                 /* status       = */ MPI_STATUS_IGNORE);
 
-                printf("Received buffer from processor: %d\n", i);
-
-                for(int j = start_vertex; j < end_vertex; j++) {
+                for(int j = 0; j < n; j++) {
                     pr_next[j] += buffer[j];
                 }
             }
@@ -200,7 +208,7 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
                 MPI_Send(
                 /* data         = */ starter, 
                 /* count        = */ count, 
-                /* datatype     = */ MPI_INT64_T, 
+                /* datatype     = */ PAGERANK_MPI_TYPE, 
                 /* destination  = */ i, 
                 /* tag          = */ 0, 
                 /* communicator = */ MPI_COMM_WORLD);
@@ -215,7 +223,7 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
             MPI_Send(
             /* data         = */ pr_next, 
             /* count        = */ n, 
-            /* datatype     = */ MPI_INT64_T, 
+            /* datatype     = */ PAGERANK_MPI_TYPE, 
             /* destination  = */ ROOT_PROCESSOR, 
             /* tag          = */ 0, 
             /* communicator = */ MPI_COMM_WORLD);
@@ -224,8 +232,8 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
 
             MPI_Recv(
             /* data         = */ buffer, 
-            /* count        = */ end_vertex - start_vertex, 
-            /* datatype     = */ MPI_INT64_T, 
+            /* count        = */ (end_vertex - start_vertex), 
+            /* datatype     = */ PAGERANK_MPI_TYPE, 
             /* source       = */ ROOT_PROCESSOR, 
             /* tag          = */ 0, 
             /* communicator = */ MPI_COMM_WORLD, 
@@ -264,7 +272,7 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
     /*send_data      = */ &local_count,
     /*recv_data      = */ &sum_of_page_ranks,
     /*count          = */ 1,
-    /*datatype       = */ MPI_INT64_T,
+    /*datatype       = */ PAGERANK_MPI_TYPE,
     /*op             = */ MPI_SUM,
     /*root           = */ ROOT_PROCESSOR,
     /*communicator   = */ MPI_COMM_WORLD);
