@@ -87,7 +87,7 @@ void triangleCountParallel(Graph &g, int& world_rank, int& P, int strategy) {
         overall_timer.start();
     }
 
-    int start_vertex = 0, end_vertex = 0;
+    uintV start_vertex = 0, end_vertex = 0;
     for(int i = 0; i < P; i++) {
         start_vertex = end_vertex;
         long count = 0;
@@ -107,7 +107,7 @@ void triangleCountParallel(Graph &g, int& world_rank, int& P, int strategy) {
 
     long local_count = 0, global_count = 0;
     uint num_edges = 0;
-    for(int u = start_vertex; u < end_vertex; u++) {
+    for(uintV u = start_vertex; u < end_vertex; u++) {
         uintE out_degree = g.vertices_[u].getOutDegree();
         num_edges += out_degree;
         for(uintE i = 0; i < out_degree; i++) {
@@ -170,15 +170,14 @@ void triangleCountParallel(Graph &g, int& world_rank, int& P, int strategy) {
 
         // API call to gather data in sub_counts
         MPI_Gather(
-            /*send_data       = */ &local_count,
-            /*send_count      = */ 1,
-            /*send_datatype   = */ MPI_LONG,
-            /*recv_data       = */ sub_counts,
-            /*recv_count      = */ 1,
-            /*recv_datatype   = */ MPI_LONG,
-            /*root            = */ ROOT_PROCESSOR,
-            /*communicator    = */ MPI_COMM_WORLD
-        );
+        /*send_data       = */ &local_count,
+        /*send_count      = */ 1,
+        /*send_datatype   = */ MPI_LONG,
+        /*recv_data       = */ sub_counts,
+        /*recv_count      = */ 1,
+        /*recv_datatype   = */ MPI_LONG,
+        /*root            = */ ROOT_PROCESSOR,
+        /*communicator    = */ MPI_COMM_WORLD);
 
         if(world_rank == ROOT_PROCESSOR) {
             int i;
@@ -193,14 +192,13 @@ void triangleCountParallel(Graph &g, int& world_rank, int& P, int strategy) {
 
         // API call to gather data in sub_counts
         MPI_Reduce(
-            /*send_data      = */ &local_count,
-            /*recv_data      = */ &global_count,
-            /*count          = */ 1,
-            /*datatype       = */ MPI_LONG,
-            /*op             = */ MPI_SUM,
-            /*root           = */ ROOT_PROCESSOR,
-            /*communicator   = */ MPI_COMM_WORLD
-        );
+        /*send_data      = */ &local_count,
+        /*recv_data      = */ &global_count,
+        /*count          = */ 1,
+        /*datatype       = */ MPI_LONG,
+        /*op             = */ MPI_SUM,
+        /*root           = */ ROOT_PROCESSOR,
+        /*communicator   = */ MPI_COMM_WORLD);
 
         communication_time += comm_timer.stop();
     }
