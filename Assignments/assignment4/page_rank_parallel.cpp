@@ -52,6 +52,13 @@ void pageRankSerial(Graph &g, int max_iters)
                 pr_next[v] += (pr_curr[u] / out_degree);
             }
         }
+
+        // int summation = 0;
+        // for(int i = 0; i < n; i++) {
+        //     summation += pr_next[i];
+        // }
+        // std::cout << "summation is : " << summation << std::endl;
+
         for (uintV v = 0; v < n; v++)
         {
             pr_next[v] = PAGE_RANK(pr_next[v]);
@@ -102,11 +109,12 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
 
     uintV* start_indices = NULL;
     int start_vertex = 0, end_vertex = 0;
-    for(int i = 0; i < P; i++) {
 
-        if(i == ROOT_PROCESSOR) {
-            start_indices = (uintV*) malloc(sizeof(uintV) * P);
-        }
+    if(world_rank == ROOT_PROCESSOR) {
+        start_indices = (uintV*) malloc(sizeof(uintV) * P);
+    }
+
+    for(int i = 0; i < P; i++) {
 
         start_vertex = end_vertex;
         long count = 0;
@@ -119,7 +127,7 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
             }
         }
 
-        if(i == ROOT_PROCESSOR) {
+        if(world_rank == ROOT_PROCESSOR) {
             start_indices[i] = start_vertex;
         }
 
@@ -129,11 +137,12 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
     }
 
     if(world_rank == ROOT_PROCESSOR) {
-        for(int i = 0; i < P; i++) {
-            std::cout << start_indices[i] << " ";
-        }
-        std::cout<<std::endl;
-    } 
+        // Reset the start index for root processor
+        start_vertex = start_indices[ROOT_PROCESSOR];
+
+        // End vertex should be the start vertex of next processor
+        end_vertex = start_indices[ROOT_PROCESSOR + 1];
+    }
 
     // Push based pagerank
     // -------------------------------------------------------------------
@@ -141,15 +150,11 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
     // ----- Initializing required buffers ----
 
     PageRankType* buffer = NULL;
-    PageRankType* starter = NULL;
 
     if(world_rank == ROOT_PROCESSOR) {
-        // buffer = new PageRankType[n];
         buffer = (PageRankType*) malloc(sizeof(PageRankType) * n);
-        starter = &pr_next[end_vertex];
     } else {
         buffer = (PageRankType*) malloc(sizeof(PageRankType) * (end_vertex - start_vertex));
-        // buffer = new PageRankType[end_vertex - start_vertex];
     }
 
     // ---- Buffers initialization finish ----
@@ -195,8 +200,6 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
                 }
             }
 
-            printf("Received information from all other processors\n");
-
             for(int i = 1; i < P; i++) {
                 int count;
                 if(i != P - 1) {
@@ -206,15 +209,13 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
                 }
 
                 MPI_Send(
-                /* data         = */ starter, 
+                /* data         = */ &pr_next[start_indices[i]], 
                 /* count        = */ count, 
                 /* datatype     = */ PAGERANK_MPI_TYPE, 
                 /* destination  = */ i, 
                 /* tag          = */ 0, 
                 /* communicator = */ MPI_COMM_WORLD);
             }
-
-            printf("Sent information to all other processors from root\n");
 
         } else {
 
@@ -228,18 +229,15 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
             /* tag          = */ 0, 
             /* communicator = */ MPI_COMM_WORLD);
 
-            printf("Sent current values to root from processor : %d\n", world_rank);
-
             MPI_Recv(
             /* data         = */ buffer, 
+            // /* data         = */ &pr_next[start_vertex], 
             /* count        = */ (end_vertex - start_vertex), 
             /* datatype     = */ PAGERANK_MPI_TYPE, 
             /* source       = */ ROOT_PROCESSOR, 
             /* tag          = */ 0, 
             /* communicator = */ MPI_COMM_WORLD, 
             /* status       = */ MPI_STATUS_IGNORE);
-
-            printf("Recieved my updated values to next iteration : %d\n", world_rank);
 
         }
 
@@ -248,7 +246,8 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
         for (uintV v = 0; v < n; v++)
         {
             if(v >= start_vertex && v < end_vertex) {
-                pr_next[v] = PAGE_RANK(buffer[v - start_vertex]);
+                if(world_rank == ROOT_PROCESSOR) pr_next[v] = PAGE_RANK(pr_next[v - start_vertex]);
+                else pr_next[v] = PAGE_RANK(buffer[v - start_vertex]);
 
                 // reset pr_curr for the next iteration
                 pr_curr[v] = pr_next[v];
@@ -280,11 +279,210 @@ void pageRankParallelS1(Graph &g, int max_iters, int world_rank, int P) {
     // ---- Synchronization phase 2 ends ----
 
     if(world_rank == ROOT_PROCESSOR) {
-        std::cout << "Done from processor: " << world_rank << std::endl;
         std::cout << "Sum of page rank : " << sum_of_page_ranks << "\n";
         // std::cout << "Time taken (in seconds) : " << std::setprecision(TIME_PRECISION) << time_taken << "\n";
     } else {
-        std::cout << "Done from processor: " << world_rank << std::endl;
+        // std::cout << "Done from processor: " << world_rank << std::endl;
+    }
+
+    delete[] pr_curr;
+    delete[] pr_next;
+}
+
+void pageRankParallelS2(Graph &g, int max_iters, int world_rank, int P) {
+    uintV n = g.n_;
+    double time_taken = 0.0, communication_time = 0.0;
+    timer overall_timer, comm_timer;
+
+    PageRankType *pr_curr = new PageRankType[n];
+    PageRankType *pr_next = new PageRankType[n];
+
+    // if(world_rank == ROOT_PROCESSOR) {
+    //     overall_timer.start();
+    // }
+
+    for (uintV i = 0; i < n; i++)
+    {
+        pr_curr[i] = INIT_PAGE_RANK;
+        pr_next[i] = 0.0;
+    }
+
+    uintV* start_indices = NULL;
+    int start_vertex = 0, end_vertex = 0;
+
+    if(world_rank == ROOT_PROCESSOR) {
+        start_indices = (uintV*) malloc(sizeof(uintV) * P);
+    }
+
+    for(int i = 0; i < P; i++) {
+
+        start_vertex = end_vertex;
+        long count = 0;
+
+        while(end_vertex < g.n_) {
+            count += g.vertices_[end_vertex].getOutDegree();
+            end_vertex += 1;
+            if(count >= g.m_/P) {
+                break;
+            }
+        }
+
+        if(world_rank == ROOT_PROCESSOR) {
+            start_indices[i] = start_vertex;
+        }
+
+        if(i == world_rank && i != ROOT_PROCESSOR) {
+            break;
+        }
+    }
+
+    if(world_rank == ROOT_PROCESSOR) {
+        // Reset the start index for root processor
+        start_vertex = start_indices[ROOT_PROCESSOR];
+
+        // End vertex should be the start vertex of next processor
+        end_vertex = start_indices[ROOT_PROCESSOR + 1];
+    }
+
+    // Push based pagerank
+    // -------------------------------------------------------------------
+
+    // ----- Initializing required buffers ----
+
+    PageRankType* buffer = NULL;
+
+    if(world_rank == ROOT_PROCESSOR) {
+        buffer = (PageRankType*) malloc(sizeof(PageRankType) * n);
+    } else {
+        buffer = (PageRankType*) malloc(sizeof(PageRankType) * (end_vertex - start_vertex));
+    }
+
+    // ---- Buffers initialization finish ----
+
+    uint num_edges = 0;
+    for (int iter = 0; iter < max_iters; iter++)
+    {
+        // for each vertex 'u', process all its outNeighbors 'v'
+        for (uintV u = start_vertex; u < end_vertex; u++)
+        {
+            uintE out_degree = g.vertices_[u].getOutDegree();
+            num_edges += out_degree;
+            for (uintE i = 0; i < out_degree; i++)
+            {
+                uintV v = g.vertices_[u].getOutNeighbor(i);
+                pr_next[v] += (pr_curr[u] / out_degree);
+            }
+        }
+
+        // ---- Synchronization phase 1 starts ----
+
+        // If process != root, send values of all nodes to root
+        // Root receives and adds them together
+        // Sends it to all processes
+
+        if(world_rank == ROOT_PROCESSOR) {
+
+            // First receives from everyone and then send to everyone
+
+            for(int i = 1; i < P; i++) {
+
+                MPI_Recv(
+                /* data         = */ buffer, 
+                /* count        = */ n, 
+                /* datatype     = */ PAGERANK_MPI_TYPE, 
+                /* source       = */ i, 
+                /* tag          = */ 0, 
+                /* communicator = */ MPI_COMM_WORLD, 
+                /* status       = */ MPI_STATUS_IGNORE);
+
+                for(int j = 0; j < n; j++) {
+                    pr_next[j] += buffer[j];
+                }
+            }
+
+            for(int i = 1; i < P; i++) {
+                int count;
+                if(i != P - 1) {
+                    count = start_indices[i+1] - start_indices[i];
+                } else {
+                    count = n - start_indices[i];
+                }
+
+                MPI_Send(
+                /* data         = */ &pr_next[start_indices[i]], 
+                /* count        = */ count, 
+                /* datatype     = */ PAGERANK_MPI_TYPE, 
+                /* destination  = */ i, 
+                /* tag          = */ 0, 
+                /* communicator = */ MPI_COMM_WORLD);
+            }
+
+        } else {
+
+            // First send to root and then receive from root
+
+            MPI_Send(
+            /* data         = */ pr_next, 
+            /* count        = */ n, 
+            /* datatype     = */ PAGERANK_MPI_TYPE, 
+            /* destination  = */ ROOT_PROCESSOR, 
+            /* tag          = */ 0, 
+            /* communicator = */ MPI_COMM_WORLD);
+
+            MPI_Recv(
+            /* data         = */ buffer, 
+            // /* data         = */ &pr_next[start_vertex], 
+            /* count        = */ (end_vertex - start_vertex), 
+            /* datatype     = */ PAGERANK_MPI_TYPE, 
+            /* source       = */ ROOT_PROCESSOR, 
+            /* tag          = */ 0, 
+            /* communicator = */ MPI_COMM_WORLD, 
+            /* status       = */ MPI_STATUS_IGNORE);
+
+        }
+
+        // ---- Synchronization phase 1 ends ----
+
+        for (uintV v = 0; v < n; v++)
+        {
+            if(v >= start_vertex && v < end_vertex) {
+                if(world_rank == ROOT_PROCESSOR) pr_next[v] = PAGE_RANK(pr_next[v - start_vertex]);
+                else pr_next[v] = PAGE_RANK(buffer[v - start_vertex]);
+
+                // reset pr_curr for the next iteration
+                pr_curr[v] = pr_next[v];
+            }
+
+            pr_next[v] = 0.0;
+        }
+    }
+
+    // -------------------------------------------------------------------    
+
+    PageRankType local_count = 0, sum_of_page_ranks = 0;
+    for (uintV u = start_vertex; u < end_vertex; u++)
+    {
+        local_count += pr_curr[u];
+    }
+
+    // ---- Synchronization phase 2 starts ----
+
+    MPI_Reduce(
+    /*send_data      = */ &local_count,
+    /*recv_data      = */ &sum_of_page_ranks,
+    /*count          = */ 1,
+    /*datatype       = */ PAGERANK_MPI_TYPE,
+    /*op             = */ MPI_SUM,
+    /*root           = */ ROOT_PROCESSOR,
+    /*communicator   = */ MPI_COMM_WORLD);
+
+    // ---- Synchronization phase 2 ends ----
+
+    if(world_rank == ROOT_PROCESSOR) {
+        std::cout << "Sum of page rank : " << sum_of_page_ranks << "\n";
+        // std::cout << "Time taken (in seconds) : " << std::setprecision(TIME_PRECISION) << time_taken << "\n";
+    } else {
+        // std::cout << "Done from processor: " << world_rank << std::endl;
     }
 
     delete[] pr_curr;
@@ -305,13 +503,6 @@ int main(int argc, char *argv[])
     uint max_iterations = cl_options["nIterations"].as<uint>();
     std::string input_file_path = cl_options["inputFile"].as<std::string>();
 
-#ifdef USE_INT
-    std::cout << "Using INT\n";
-#else
-    std::cout << "Using FLOAT\n";
-#endif
-    std::cout << std::fixed;
-
     // MPI initializing
     MPI_Init(NULL, NULL);
 
@@ -324,6 +515,12 @@ int main(int argc, char *argv[])
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
 
     if(world_rank == ROOT_PROCESSOR) {
+        #ifdef USE_INT
+            std::cout << "Using INT\n";
+        #else
+            std::cout << "Using FLOAT\n";
+        #endif
+            std::cout << std::fixed;
         // Get the world size and print it out here
         // std::cout << "World size : " << world_size << "\n"
         std::cout << "Communication strategy : " << strategy << "\n";
@@ -342,6 +539,7 @@ int main(int argc, char *argv[])
         pageRankParallelS1(g, max_iterations, world_rank, world_size);
         break;
     case 2:
+        pageRankParallelS1(g, max_iterations, world_rank, world_size);
         break;
     case 3:
         break;
