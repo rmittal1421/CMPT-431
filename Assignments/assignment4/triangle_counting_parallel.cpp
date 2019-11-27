@@ -124,8 +124,10 @@ void triangleCountParallel(Graph &g, int& world_rank, int& P, int strategy) {
     // ---- Synchronization phase starts ----
 
     if(strategy == 1) {
+
+        comm_timer.start();
+
         if(world_rank == ROOT_PROCESSOR) {
-            comm_timer.start();
 
             global_count += local_count;
             int i;
@@ -145,10 +147,7 @@ void triangleCountParallel(Graph &g, int& world_rank, int& P, int strategy) {
                 global_count += number;
 
             }
-
-            communication_time += comm_timer.stop();
         } else {
-            comm_timer.start();
 
             MPI_Send(
             /* data         = */ &local_count, 
@@ -158,8 +157,10 @@ void triangleCountParallel(Graph &g, int& world_rank, int& P, int strategy) {
             /* tag          = */ 0, 
             /* communicator = */ MPI_COMM_WORLD);
 
-            communication_time += comm_timer.stop();
         }
+
+        communication_time += comm_timer.stop();
+        
     } else if(strategy == 2) {
         long *sub_counts = NULL;
         if(world_rank == ROOT_PROCESSOR) {
